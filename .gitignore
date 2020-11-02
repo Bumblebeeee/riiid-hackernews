@@ -1,0 +1,7 @@
+**/.terraform/
+env/
+*.tfstate
+*.backup
+*.zip
+output.txt
+python/
