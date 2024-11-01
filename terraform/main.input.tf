@@ -5,9 +5,13 @@ variable "env" {
   default = "dev"
 }
 variable "profiles" {
-  type = map
+  type = map(any)
   default = {
     "dev"  = "dev"
     "prod" = "prod"
   }
+}
+
+variable "if_publish" {
+  type = bool
 }

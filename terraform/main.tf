@@ -2,18 +2,37 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 2.70"
+      version = "~> 3.0"
     }
   }
   backend "s3" {
-    bucket = "riiid-hackernews"
-    key    = "riiid-hackernews.tfstate"
-    region = "us-east-1"
+    bucket  = "terraform-encrypted-s3-backend"
+    key     = "riiid-hackernews.tfstate"
+    region  = "us-east-1"
+    profile = "david_s3"
   }
 }
 provider "aws" {
-  profile = var.profiles[var.env]
+  #profile = var.profiles[var.env]
+  profile = "david_s3"
   region  = var.region
+}
+resource "aws_lambda_alias" "lambda_alias_prod" {
+  count = var.if_publish ? 1 : 0
+  name = "prod"
+  # description      = "a sample description"
+  function_name    = aws_lambda_function.riiid_hackernews_lambda.arn
+  function_version = aws_lambda_function.riiid_hackernews_lambda.version
+  depends_on = [
+    aws_lambda_function.riiid_hackernews_lambda
+  ]
+}
+
+resource "aws_lambda_alias" "lambda_alias_qa" {
+  name = "qa"
+  # description      = "a sample description"
+  function_name    = aws_lambda_function.riiid_hackernews_lambda.arn
+  function_version = "$LATEST"
 }
 
 resource "aws_lambda_function" "riiid_hackernews_lambda" {
@@ -32,6 +51,8 @@ resource "aws_lambda_function" "riiid_hackernews_lambda" {
     aws_iam_role_policy_attachment.riiid_hackernews_lambda_logs,
     aws_cloudwatch_log_group.riiid_hackernews_lambda_log_group,
   ]
+
+  publish = var.if_publish
 }
 
 resource "aws_lambda_layer_version" "riiid_hackernews_layer" {
@@ -60,28 +81,28 @@ resource "aws_iam_role" "role_lambda_exec" {
 EOF
 }
 
-resource "aws_iam_policy" "lambda_logging" {
-  name        = "lambda_logging"
-  path        = "/"
-  description = "Policy for lambda function logging"
+# resource "aws_iam_policy" "lambda_logging" {
+#   name        = "lambda_logging"
+#   path        = "/"
+#   description = "Policy for lambda function logging"
 
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ],
-      "Resource": "arn:aws:logs:*:*:*",
-      "Effect": "Allow"
-    }
-  ]
-}
-EOF
-}
+#   policy = <<EOF
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Action": [
+#         "logs:CreateLogGroup",
+#         "logs:CreateLogStream",
+#         "logs:PutLogEvents"
+#       ],
+#       "Resource": "arn:aws:logs:*:*:*",
+#       "Effect": "Allow"
+#     }
+#   ]
+# }
+# EOF
+# }
 
 resource "aws_cloudwatch_log_group" "riiid_hackernews_lambda_log_group" {
   name              = "/aws/lambda/riiid_hackernews_lambda"
@@ -89,7 +110,7 @@ resource "aws_cloudwatch_log_group" "riiid_hackernews_lambda_log_group" {
 }
 resource "aws_iam_role_policy_attachment" "riiid_hackernews_lambda_logs" {
   role       = aws_iam_role.role_lambda_exec.name
-  policy_arn = aws_iam_policy.lambda_logging.arn
+  policy_arn = "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
 }
 
 
